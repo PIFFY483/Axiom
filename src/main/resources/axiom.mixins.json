@@ -6,7 +6,8 @@
   "refmap": "axiom.refmap.json",
   "mixins": [],
   "client": [
-    "HumanoidModelMixin"
+    "HumanoidModelMixin",
+    "ModelPartMixin"
   ],
   "injectors": {
     "defaultRequire": 1

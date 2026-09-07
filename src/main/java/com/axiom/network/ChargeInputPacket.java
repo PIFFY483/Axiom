@@ -7,20 +7,23 @@ import net.minecraftforge.network.PacketDistributor;
 
 import java.util.function.Supplier;
 
-/** Client -> Server: oyuncu V tusuna basti/birakti. */
+/** Client -> Server: oyuncu bir skill slotuna basti/birakti. */
 public class ChargeInputPacket {
+    public final String skillId;
     public final boolean pressed;
 
-    public ChargeInputPacket(boolean pressed) {
+    public ChargeInputPacket(String skillId, boolean pressed) {
+        this.skillId = skillId;
         this.pressed = pressed;
     }
 
     public static void encode(ChargeInputPacket msg, FriendlyByteBuf buf) {
+        buf.writeUtf(msg.skillId);
         buf.writeBoolean(msg.pressed);
     }
 
     public static ChargeInputPacket decode(FriendlyByteBuf buf) {
-        return new ChargeInputPacket(buf.readBoolean());
+        return new ChargeInputPacket(buf.readUtf(), buf.readBoolean());
     }
 
     public static void handle(ChargeInputPacket msg, Supplier<NetworkEvent.Context> ctxSupplier) {
@@ -29,13 +32,16 @@ public class ChargeInputPacket {
             ServerPlayer player = ctx.getSender();
             if (player == null) return;
 
-            System.out.println("[Axiom] Server paketi aldi: " + player.getGameProfile().getName() + " pressed=" + msg.pressed);
+            System.out.println("[Axiom] Server paketi aldi: " + player.getGameProfile().getName()
+                    + " skill=" + msg.skillId + " pressed=" + msg.pressed);
 
             // TODO: burada istersen sunucu tarafi dogrulama/cooldown kontrolu ekle
-            // (ornegin oyuncu zaten baska bir sey yapiyorsa charge baslatma).
+            // (ornegin oyuncu zaten baska bir sey yapiyorsa charge baslatma,
+            // ya da msg.skillId'nin oyuncunun gercekten sahip oldugu bir skill
+            // olup olmadigini kontrol et).
 
             long gameTime = player.level().getGameTime();
-            ChargeSyncPacket sync = new ChargeSyncPacket(player.getId(), msg.pressed, gameTime);
+            ChargeSyncPacket sync = new ChargeSyncPacket(player.getId(), msg.skillId, msg.pressed, gameTime);
 
             // Bu oyuncuyu goren HERKESE (kendisi dahil) yeni durumu yayinla,
             // boylece animasyon 3. sahis goruntude de dogru oynar.

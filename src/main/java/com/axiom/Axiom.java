@@ -1,5 +1,8 @@
 package com.axiom;
 
+import com.axiom.anim.AxiomAnimationRegistry;
+import com.axiom.network.ModNetwork;
+import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -12,5 +15,15 @@ public class Axiom {
     public Axiom() {
         var modBus = FMLJavaModLoadingContext.get().getModEventBus();
         var forgeBus = MinecraftForge.EVENT_BUS;
+
+        ModNetwork.register();
+        modBus.addListener(this::registerReloadListeners);
+    }
+
+    // Bu event ilk kaynak yuklemesine de dahil olur (FMLClientSetupEvent'te
+    // manuel registerReloadListener cagirmak SADECE sonraki reload'lara
+    // (F3+T) dahil olurdu, ilk yuklemeyi kacirirdi - hata buydu).
+    private void registerReloadListeners(RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener(AxiomAnimationRegistry.INSTANCE);
     }
 }

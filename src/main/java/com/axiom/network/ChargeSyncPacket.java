@@ -53,7 +53,8 @@ public class ChargeSyncPacket {
             // birden fazla skill ayni anda aktif olabilir (EntityPoseStates
             // her poseId'yi kendi icinde izole tutuyor).
             if (msg.charging) {
-                EntityPoseStates.startCharging(msg.entityId, skill.id(), skill.animation(), skill.chargeCap());
+                EntityPoseStates.startCharging(msg.entityId, skill.id(), skill.animation(), skill.chargeCap(),
+                        skill.postChargePlayDuration(), com.axiom.anim.PoseAnimationPlayer.DEFAULT_RETURN_DURATION);
             } else {
                 EntityPoseStates.release(msg.entityId, skill.id());
             }

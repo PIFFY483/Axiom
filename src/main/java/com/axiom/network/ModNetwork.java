@@ -23,5 +23,8 @@ public class ModNetwork {
 
         CHANNEL.registerMessage(nextId++, ChargeSyncPacket.class,
                 ChargeSyncPacket::encode, ChargeSyncPacket::decode, ChargeSyncPacket::handle);
+
+        CHANNEL.registerMessage(nextId++, DashUppercutFxPacket.class,
+                DashUppercutFxPacket::encode, DashUppercutFxPacket::decode, DashUppercutFxPacket::handle);
     }
 }

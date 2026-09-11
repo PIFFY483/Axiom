@@ -54,6 +54,14 @@ public final class EntityPoseStates {
                 .startCharging();
     }
 
+    /** Sikistirilmis post-charge oynatma suresi + donus suresi ikisi birden. */
+    public static void startCharging(int entityId, String poseId, PoseAnimation animation,
+                                      float chargeCap, float postChargePlayDuration, float returnDuration) {
+        playersOf(entityId)
+                .computeIfAbsent(poseId, id -> new PoseAnimationPlayer(animation, chargeCap, postChargePlayDuration, returnDuration))
+                .startCharging();
+    }
+
     public static void release(int entityId, String poseId) {
         Map<String, PoseAnimationPlayer> byPose = STATES.get(entityId);
         if (byPose == null) return;

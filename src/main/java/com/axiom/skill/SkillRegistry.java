@@ -1,6 +1,7 @@
 package com.axiom.skill;
 
 import com.axiom.anim.pose.DashUppercutPose;
+import com.axiom.skill.effect.DashUppercutEffect;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -26,7 +27,9 @@ public final class SkillRegistry {
     private static final Map<String, Skill> SKILLS = new LinkedHashMap<>();
 
     static {
-        register(new Skill("dash_uppercut", "Dash Uppercut", DashUppercutPose.INSTANCE, DashUppercutPose.CHARGE_PHASE_END));
+        register(new Skill("dash_uppercut", "Dash Uppercut", DashUppercutPose.INSTANCE,
+                DashUppercutPose.CHARGE_PHASE_END, DashUppercutPose.POST_CHARGE_PLAY_DURATION,
+                DashUppercutEffect.INSTANCE));
     }
 
     public static void register(Skill skill) {

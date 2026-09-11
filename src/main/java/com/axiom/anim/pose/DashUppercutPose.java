@@ -12,6 +12,16 @@ public final class DashUppercutPose implements PoseAnimation {
     private static final float LENGTH = 3.0f;
     public static final float CHARGE_PHASE_END = 2.0f;
 
+    /** Karakterin one atildigi (leap) animasyon-zamani ani (2. saniyede DEGIL, 2.2'de). */
+    public static final float DASH_TRIGGER_TIME = 2.2f;
+
+    /** 2. saniyeden sonraki (dash+yumruk) kismin oyunda GERCEK zamanda oynatilma
+     *  suresi. Animasyon verisinde bu kisim 1 saniye (2.0 -> LENGTH=3.0), ama
+     *  her zaman bu sabit sureye sikistirilir/hizlandirilir - hedefe fiilen
+     *  ulasma isi animasyon suresine degil, sarja gore olcek olan fiziksel
+     *  atilma hizina birakilir (bkz. DashUppercutEffect). */
+    public static final float POST_CHARGE_PLAY_DURATION = 0.5f;
+
     /** TEST ANAHTARI: vurus ters yone donuyorsa / bacaklar one aciliyorsa true yap. */
     private static final boolean FLIP_YAW = false;
 

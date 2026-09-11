@@ -8,15 +8,40 @@ import java.util.Map;
 public class PoseAnimationPlayer {
     public enum Phase { IDLE, CHARGING, RELEASING, RETURNING }
 
-    private static final float DEFAULT_RETURN_DURATION = 0.25f;
+    public static final float DEFAULT_RETURN_DURATION = 0.25f;
+
+    /** postChargePlayDuration icin sinyal deger: sikistirma yok, animasyon
+     *  2.saniyeden sonraki kismini kendi dogal (verideki) hizinda oynar. */
+    public static final float NATURAL_PACE = -1f;
+
+    /** Erken birakmada (chargeCap'e ulasmadan) animasyonun ani atlama yapmadan
+     *  sarj noktasina (chargeCap) baglanmasi icin gecen sure (saniye). */
+    private static final float RELEASE_CATCHUP_DURATION = 0.15f;
+
+    /** Sikistirilmis post-charge animasyonu (2.saniye sonrasi) hedefe daha
+     *  ulasilmadan biterse, son karede ek olarak ne kadar daha tutulacagi -
+     *  gercek "hedefe varinca birak" sunucu senkronu olmadan basit bir
+     *  yaklasim (bkz. class yorumu). */
+    private static final float HOLD_AFTER_END = 0.35f;
 
     private final PoseAnimation animation;
     private final float chargeCap;
+    private final float postChargePlayDuration;
     private final float returnDuration;
     private Phase phase = Phase.IDLE;
     private long phaseStartNanos = 0L;
     private float phaseStartElapsed = 0f;
     private boolean restorePending = false;
+
+    /** RELEASING fazinin ilk RELEASE_CATCHUP_DURATION saniyesinde, erken
+     *  birakma anindaki gercek elapsed'den chargeCap'e smooth gecis yapar. */
+    private boolean earlyReleaseBlend = false;
+    private float releaseBlendFromElapsed = 0f;
+    private long releaseBlendStartNanos = 0L;
+
+    /** chargeCap'e ulasildigi (dogal ya da erken-blend sonrasi) an - post-charge
+     *  (2.saniye sonrasi) kisminin zaman-yeniden-olcekleme referansi. */
+    private long postChargeStartNanos = 0L;
 
     private static final class Pivot {
         float x, y, z;
@@ -34,12 +59,17 @@ public class PoseAnimationPlayer {
     private final Map<String, ExitPose> exitPoses = new HashMap<>();
 
     public PoseAnimationPlayer(PoseAnimation animation, float chargeCap) {
-        this(animation, chargeCap, DEFAULT_RETURN_DURATION);
+        this(animation, chargeCap, NATURAL_PACE, DEFAULT_RETURN_DURATION);
     }
 
     public PoseAnimationPlayer(PoseAnimation animation, float chargeCap, float returnDuration) {
+        this(animation, chargeCap, NATURAL_PACE, returnDuration);
+    }
+
+    public PoseAnimationPlayer(PoseAnimation animation, float chargeCap, float postChargePlayDuration, float returnDuration) {
         this.animation = animation;
         this.chargeCap = chargeCap;
+        this.postChargePlayDuration = postChargePlayDuration;
         this.returnDuration = returnDuration;
     }
 
@@ -54,16 +84,43 @@ public class PoseAnimationPlayer {
     }
 
     public void release() {
-        if (phase == Phase.CHARGING) {
-            phaseStartNanos = System.nanoTime();
-            phaseStartElapsed = chargeCap;
-            phase = Phase.RELEASING;
+        if (phase != Phase.CHARGING) return;
+        beginReleasing(Math.min(computeElapsed(), chargeCap));
+    }
+
+    /**
+     * CHARGING -> RELEASING geçişini başlatır. chargeElapsedAtTrigger chargeCap'e
+     * eşitse (tavana kadar tutuldu) direkt oradan devam eder - snap yok, çünkü
+     * zaten o noktadaydık. chargeCap'ten küçükse (erken bırakma) ani atlama
+     * yapmadan RELEASE_CATCHUP_DURATION boyunca chargeCap'e smooth blend eder.
+     */
+    private void beginReleasing(float chargeElapsedAtTrigger) {
+        phase = Phase.RELEASING;
+        if (chargeElapsedAtTrigger < chargeCap) {
+            earlyReleaseBlend = true;
+            releaseBlendFromElapsed = chargeElapsedAtTrigger;
+            releaseBlendStartNanos = System.nanoTime();
+        } else {
+            earlyReleaseBlend = false;
+            startPostCharge();
         }
+    }
+
+    private void startPostCharge() {
+        postChargeStartNanos = System.nanoTime();
+    }
+
+    /** postChargePlayDuration NATURAL_PACE ise (sinyal), animasyonun kendi dogal
+     *  post-charge suresini (length - chargeCap) kullan; degilse sabit sureye sikistir. */
+    private float effectivePostChargeDuration() {
+        float natural = animation.length() - chargeCap;
+        return postChargePlayDuration > 0f ? postChargePlayDuration : natural;
     }
 
     public void reset() {
         phase = Phase.IDLE;
         restorePending = true;
+        earlyReleaseBlend = false;
     }
 
     private float computeElapsed() {
@@ -128,21 +185,52 @@ public class PoseAnimationPlayer {
 
         float elapsed;
         if (phase == Phase.CHARGING) {
-            elapsed = Math.min(computeElapsed(), chargeCap);
+            float chargeElapsed = computeElapsed();
+            if (chargeElapsed < chargeCap) {
+                elapsed = chargeElapsed;
+            } else {
+                // Eskiden burada chargeCap'te DURUYORDU (Math.min ile clamp).
+                // Artik tavana ulasinca otomatik olarak atilma/yumruk fazina
+                // geciyor - tus birakilmasi beklenmiyor.
+                beginReleasing(chargeCap);
+                elapsed = chargeCap;
+            }
         } else { // RELEASING
-            elapsed = computeElapsed();
-            if (elapsed >= animation.length()) {
-                float end = animation.length();
-                captureExitPose("body", animation.sampleBody(end));
-                captureExitPose("head", animation.sampleHead(end));
-                captureExitPose("rightArm", animation.sampleRightArm(end));
-                captureExitPose("leftArm", animation.sampleLeftArm(end));
-                captureExitPose("rightLeg", animation.sampleRightLeg(end));
-                captureExitPose("leftLeg", animation.sampleLeftLeg(end));
-                phase = Phase.RETURNING;
-                phaseStartNanos = System.nanoTime();
-                phaseStartElapsed = 0f;
-                elapsed = end;
+            if (earlyReleaseBlend) {
+                float dt = (System.nanoTime() - releaseBlendStartNanos) / 1_000_000_000f;
+                if (dt >= RELEASE_CATCHUP_DURATION) {
+                    // Blend bitti - chargeCap'ten itibaren post-charge fazina gec.
+                    earlyReleaseBlend = false;
+                    startPostCharge();
+                    elapsed = chargeCap;
+                } else {
+                    float frac = smoothstep(clamp01(dt / RELEASE_CATCHUP_DURATION));
+                    elapsed = lerp(frac, releaseBlendFromElapsed, chargeCap);
+                }
+            } else {
+                // 2.saniye sonrasi (dash+yumruk) kismi: sabit sureye (ornegin
+                // 0.5s) sikistirilmis sekilde oynar, sonra hedefe fiziksel
+                // olarak ulasilana kadar (HOLD_AFTER_END kadar ek sure) son
+                // karede tutulur - "animasyon bitince direkt vanilla'ya
+                // donme" davranisi yerine.
+                float duration = effectivePostChargeDuration();
+                float dt = (System.nanoTime() - postChargeStartNanos) / 1_000_000_000f;
+                float progress = duration <= 1.0e-5f ? 1f : clamp01(dt / duration);
+                elapsed = chargeCap + progress * (animation.length() - chargeCap);
+
+                if (dt >= duration + HOLD_AFTER_END) {
+                    float end = animation.length();
+                    captureExitPose("body", animation.sampleBody(end));
+                    captureExitPose("head", animation.sampleHead(end));
+                    captureExitPose("rightArm", animation.sampleRightArm(end));
+                    captureExitPose("leftArm", animation.sampleLeftArm(end));
+                    captureExitPose("rightLeg", animation.sampleRightLeg(end));
+                    captureExitPose("leftLeg", animation.sampleLeftLeg(end));
+                    phase = Phase.RETURNING;
+                    phaseStartNanos = System.nanoTime();
+                    phaseStartElapsed = 0f;
+                    elapsed = end;
+                }
             }
         }
         applyBone(animation.sampleBody(elapsed), body, bodyP);

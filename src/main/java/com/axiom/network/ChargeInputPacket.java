@@ -1,5 +1,8 @@
 package com.axiom.network;
 
+import com.axiom.skill.ChargeSessionManager;
+import com.axiom.skill.Skill;
+import com.axiom.skill.SkillRegistry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -41,6 +44,19 @@ public class ChargeInputPacket {
             // olup olmadigini kontrol et).
 
             long gameTime = player.level().getGameTime();
+
+            // Skill'in sunucu-taraf etkisini (varsa) tetiklemek icin sarj
+            // sessiyonunu yonet - CHARGE_PHASE_END'e otomatik ulasma
+            // ChargeSessionManager.tickAll() uzerinden ayrica isleniyor.
+            Skill skill = SkillRegistry.get(msg.skillId);
+            if (skill != null) {
+                if (msg.pressed) {
+                    ChargeSessionManager.startCharging(player, msg.skillId, gameTime);
+                } else {
+                    ChargeSessionManager.releaseEarly(player, skill, gameTime);
+                }
+            }
+
             ChargeSyncPacket sync = new ChargeSyncPacket(player.getId(), msg.skillId, msg.pressed, gameTime);
 
             // Bu oyuncuyu goren HERKESE (kendisi dahil) yeni durumu yayinla,

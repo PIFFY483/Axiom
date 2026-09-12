@@ -26,5 +26,14 @@ public class ModNetwork {
 
         CHANNEL.registerMessage(nextId++, DashUppercutFxPacket.class,
                 DashUppercutFxPacket::encode, DashUppercutFxPacket::decode, DashUppercutFxPacket::handle);
+
+        CHANNEL.registerMessage(nextId++, DashShockwaveFxPacket.class,
+                DashShockwaveFxPacket::encode, DashShockwaveFxPacket::decode, DashShockwaveFxPacket::handle);
+
+        CHANNEL.registerMessage(nextId++, PunchShockwaveFxPacket.class,
+                PunchShockwaveFxPacket::encode, PunchShockwaveFxPacket::decode, PunchShockwaveFxPacket::handle);
+
+        CHANNEL.registerMessage(nextId++, TargetLockPacket.class,
+                TargetLockPacket::encode, TargetLockPacket::decode, TargetLockPacket::handle);
     }
 }

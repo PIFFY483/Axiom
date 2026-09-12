@@ -1,8 +1,11 @@
 package com.axiom.skill;
 
+import com.axiom.network.ModNetwork;
+import com.axiom.network.TargetLockPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraftforge.network.PacketDistributor;
 
 import java.util.Map;
 import java.util.UUID;
@@ -30,6 +33,7 @@ public final class SkillTriggerScheduler {
         final long impactAtGameTime;
         final long impactTimeoutGameTime;
         boolean dashDone = false;
+        boolean impactMomentFired = false; // onImpactMoment() TAM BIR KEZ cagrilsin diye
 
         Pending(Skill skill, float chargeRatio, LivingEntity target,
                 long dashAtGameTime, long impactAtGameTime, long impactTimeoutGameTime) {
@@ -56,6 +60,20 @@ public final class SkillTriggerScheduler {
 
         PENDING.put(new Key(player.getUUID(), skill.id()),
                 new Pending(skill, chargeRatio, target, dashAt, impactAt, impactTimeout));
+
+        // Hedef simdi kilitlendi (dash daha baslamadan) - client'ta kirmizi
+        // highlight gostermesi icin bildir.
+        if (target != null) {
+            ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> target),
+                    new TargetLockPacket(target.getId(), true));
+        }
+    }
+
+    private static void clearHighlight(Pending p) {
+        if (p.target != null) {
+            ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> p.target),
+                    new TargetLockPacket(p.target.getId(), false));
+        }
     }
 
     /** Her sunucu tick'inde bir kez cagrilir. */
@@ -69,15 +87,34 @@ public final class SkillTriggerScheduler {
             long now = player.level().getGameTime();
 
             if (!p.dashDone && now >= p.dashAtGameTime) {
-                p.skill.effect().onDash(player, p.chargeRatio);
+                p.skill.effect().onDash(player, p.chargeRatio, p.target);
                 p.dashDone = true;
             }
 
+            if (p.dashDone) {
+                p.skill.effect().tickDash(player);
+            }
+
             if (now >= p.impactAtGameTime) {
+                // onImpactMoment() hedef olsun olmasin TAM OLARAK BIR KEZ (impact
+                // penceresine ilk girildiginde) cagrilir. Hedef VARSA bu artik sadece
+                // bir "haber verme" - konum-bagimli efektler bunu DEGIL, asagidaki
+                // tryImpact()'in gercekten hit/miss donduğu ani kullanmali (bkz.
+                // SkillEffect.onImpactMoment javadoc'u).
+                if (!p.impactMomentFired) {
+                    p.impactMomentFired = true;
+                    p.skill.effect().onImpactMoment(player, p.chargeRatio, p.target);
+                }
+
                 if (p.target == null) return true; // firlatilacak hedef yoktu, is bitti
+
                 boolean timedOut = now >= p.impactTimeoutGameTime;
                 boolean done = p.skill.effect().tryImpact(player, p.target, p.chargeRatio, timedOut);
-                return done || timedOut;
+                if (done || timedOut) {
+                    clearHighlight(p); // hit de olsa miss de olsa highlight kapanir
+                    return true;
+                }
+                return false;
             }
             return false;
         });

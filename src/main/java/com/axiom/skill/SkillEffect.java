@@ -74,4 +74,12 @@ public interface SkillEffect {
 
     /** Hedef menzile girmezse, impactDelaySeconds() sonrasinda ne kadar daha beklenecegi. */
     default float impactTimeoutGraceSeconds() { return 0.3f; }
+
+    /**
+     * Skill kullanim suresi boyunca (sarj basindan itibaren, dash+impact
+     * tamamen bitene kadar) oyuncunun WASD hareketini ve bakis yonunu
+     * (mouse look) kilitler mi? Varsayilan: evet - cogu "channel edilen"
+     * skill icin dogru davranis budur (bkz. SkillMovementLockManager).
+     */
+    default boolean locksMovementAndLook() { return true; }
 }

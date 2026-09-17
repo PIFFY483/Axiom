@@ -9,7 +9,8 @@
     "HumanoidModelMixin",
     "ModelPartMixin",
     "MinecraftTimerMixin",
-    "MinecraftGlowMixin"
+    "MinecraftGlowMixin",
+    "MouseHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

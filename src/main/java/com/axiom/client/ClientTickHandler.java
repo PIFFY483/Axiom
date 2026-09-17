@@ -42,6 +42,27 @@ public class ClientTickHandler {
             System.out.println("[Axiom] Slot " + slot + " (" + skillId + ") " + (isDown ? "basildi" : "birakildi") + " -> paket gonderiliyor");
             ModNetwork.CHANNEL.sendToServer(new ChargeInputPacket(skillId, isDown));
         }
+
+        // Bakis yonu (mouse look) kilidi: WASD kilidinden farkli olarak bir
+        // Forge event'i YOK, ustelik MouseHandlerMixin turnPlayer()'i zaten
+        // engelliyor - bu tick-sonu duzeltme sadece SIGORTA (mixin herhangi
+        // bir sebeple tutmazsa diye). NOT: bu kilit SkillLookLockClientState
+        // ile kontrol edilir - SkillMovementLockClientState'ten (WASD, sarj
+        // basindan itibaren aktif) FARKLI ve sadece dash+impact penceresinde
+        // aktif olur.
+        if (SkillLookLockClientState.isLocked()) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                float yaw = SkillLookLockClientState.getLockedYaw();
+                float pitch = SkillLookLockClientState.getLockedPitch();
+                mc.player.setYRot(yaw);
+                mc.player.setXRot(pitch);
+                mc.player.yRotO = yaw;
+                mc.player.xRotO = pitch;
+                mc.player.yHeadRot = yaw;
+                mc.player.yHeadRotO = yaw;
+            }
+        }
         // NOT: animasyon zamani artik PoseAnimationPlayer icinde gercek saatle
         // (System.nanoTime) hesaplaniyor, burada ayrica ilerletmeye gerek yok.
     }

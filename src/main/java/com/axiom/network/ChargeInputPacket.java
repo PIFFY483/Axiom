@@ -2,6 +2,7 @@ package com.axiom.network;
 
 import com.axiom.skill.ChargeSessionManager;
 import com.axiom.skill.Skill;
+import com.axiom.skill.SkillMovementLockManager;
 import com.axiom.skill.SkillRegistry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -52,6 +53,16 @@ public class ChargeInputPacket {
             if (skill != null) {
                 if (msg.pressed) {
                     ChargeSessionManager.startCharging(player, msg.skillId, gameTime);
+                    // Hareket (WASD/zipla) kilidi sarj basladigi andan itibaren
+                    // devreye giriyor - skill kullanim suresi boyunca (sarj +
+                    // dash + impact) karakter klavyeyle hareket ETTIRILEMEZ.
+                    // Bakis yonu/fare kilidi BUNDAN AYRI ve SADECE dash
+                    // basladiginda devreye giriyor (bkz. SkillLookLockManager
+                    // ve SkillTriggerScheduler.tickAll) - sarj sirasinda
+                    // oyuncu serbestce bakabilir.
+                    if (skill.effect() != null && skill.effect().locksMovementAndLook()) {
+                        SkillMovementLockManager.acquire(player);
+                    }
                 } else {
                     ChargeSessionManager.releaseEarly(player, skill, gameTime);
                 }

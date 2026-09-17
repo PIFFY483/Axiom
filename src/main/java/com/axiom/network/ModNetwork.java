@@ -30,8 +30,20 @@ public class ModNetwork {
         CHANNEL.registerMessage(nextId++, DashShockwaveFxPacket.class,
                 DashShockwaveFxPacket::encode, DashShockwaveFxPacket::decode, DashShockwaveFxPacket::handle);
 
+        CHANNEL.registerMessage(nextId++, DashWindTrailFxPacket.class,
+                DashWindTrailFxPacket::encode, DashWindTrailFxPacket::decode, DashWindTrailFxPacket::handle);
+
         CHANNEL.registerMessage(nextId++, PunchShockwaveFxPacket.class,
                 PunchShockwaveFxPacket::encode, PunchShockwaveFxPacket::decode, PunchShockwaveFxPacket::handle);
+
+        CHANNEL.registerMessage(nextId++, VacuumWindFxPacket.class,
+                VacuumWindFxPacket::encode, VacuumWindFxPacket::decode, VacuumWindFxPacket::handle);
+
+        CHANNEL.registerMessage(nextId++, SkillMovementLockPacket.class,
+                SkillMovementLockPacket::encode, SkillMovementLockPacket::decode, SkillMovementLockPacket::handle);
+
+        CHANNEL.registerMessage(nextId++, SkillLookLockPacket.class,
+                SkillLookLockPacket::encode, SkillLookLockPacket::decode, SkillLookLockPacket::handle);
 
         CHANNEL.registerMessage(nextId++, TargetLockPacket.class,
                 TargetLockPacket::encode, TargetLockPacket::decode, TargetLockPacket::handle);

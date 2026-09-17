@@ -89,6 +89,12 @@ public final class SkillTriggerScheduler {
             if (!p.dashDone && now >= p.dashAtGameTime) {
                 p.skill.effect().onDash(player, p.chargeRatio, p.target);
                 p.dashDone = true;
+                // Bakis yonu/fare kilidi SADECE dash basladiginda devreye
+                // giriyor - hareket (WASD) kilidi bundan AYRI, sarj
+                // basladiginda zaten devrede (bkz. ChargeInputPacket).
+                if (p.skill.effect().locksMovementAndLook()) {
+                    SkillLookLockManager.acquire(player);
+                }
             }
 
             if (p.dashDone) {
@@ -106,12 +112,28 @@ public final class SkillTriggerScheduler {
                     p.skill.effect().onImpactMoment(player, p.chargeRatio, p.target);
                 }
 
-                if (p.target == null) return true; // firlatilacak hedef yoktu, is bitti
+                if (p.target == null) {
+                    // Firlatilacak hedef yoktu, is bitti - hareket VE bakis
+                    // kilidi burada aciliyor (ikisi de - bakis kilidi henuz
+                    // acquire edilmemis bile olabilir, release() bu durumda
+                    // sessizce hicbir sey yapmaz).
+                    if (p.skill.effect().locksMovementAndLook()) {
+                        SkillMovementLockManager.release(player);
+                        SkillLookLockManager.release(player);
+                    }
+                    return true;
+                }
 
                 boolean timedOut = now >= p.impactTimeoutGameTime;
                 boolean done = p.skill.effect().tryImpact(player, p.target, p.chargeRatio, timedOut);
                 if (done || timedOut) {
                     clearHighlight(p); // hit de olsa miss de olsa highlight kapanir
+                    // Skill tamamen bitti (isabet ya da timeout) - hareket VE
+                    // bakis kilidi burada aciliyor.
+                    if (p.skill.effect().locksMovementAndLook()) {
+                        SkillMovementLockManager.release(player);
+                        SkillLookLockManager.release(player);
+                    }
                     return true;
                 }
                 return false;

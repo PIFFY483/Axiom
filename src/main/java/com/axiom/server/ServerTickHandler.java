@@ -2,6 +2,8 @@ package com.axiom.server;
 
 import com.axiom.Axiom;
 import com.axiom.skill.ChargeSessionManager;
+import com.axiom.skill.SkillLookLockManager;
+import com.axiom.skill.SkillMovementLockManager;
 import com.axiom.skill.SkillTriggerScheduler;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -32,6 +34,11 @@ public class ServerTickHandler {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ChargeSessionManager.clearPlayer(player);
+            // Hareket VE bakis kilidi haritalari da temizlenmeli - aksi
+            // halde oyuncu sarj/skill ortasinda cikarsa kilit sonsuza kadar
+            // (kullanilmayan bir UUID icin) sunucu haritasinda kalir.
+            SkillMovementLockManager.clearPlayer(player);
+            SkillLookLockManager.clearPlayer(player);
         }
     }
 }

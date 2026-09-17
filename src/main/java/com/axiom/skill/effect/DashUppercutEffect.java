@@ -4,8 +4,10 @@ import com.axiom.anim.PoseSample;
 import com.axiom.anim.pose.DashUppercutPose;
 import com.axiom.network.DashShockwaveFxPacket;
 import com.axiom.network.DashUppercutFxPacket;
+import com.axiom.network.DashWindTrailFxPacket;
 import com.axiom.network.ModNetwork;
 import com.axiom.network.PunchShockwaveFxPacket;
+import com.axiom.network.VacuumWindFxPacket;
 import com.axiom.skill.SkillEffect;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -268,6 +270,14 @@ public final class DashUppercutEffect implements SkillEffect {
                 new DashShockwaveFxPacket(
                         player.getX(), player.getY() + player.getBbHeight() * 0.5, player.getZ(),
                         (float) forward.x, (float) forward.z, power, shockwaveCount));
+
+        // YENI: ucus/leap boyunca (travelSeconds kadar) karakterin etrafinda
+        // beliren, geriye dogru akan yari-saydam ruzgar cizgileri - bkz.
+        // WindTrailFxRenderer.spawnFlightTrail. Entity ID tasiyor cunku
+        // karakter bu sure boyunca hareket halinde, sabit bir nokta degil.
+        ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player),
+                new DashWindTrailFxPacket(player.getId(), (float) forward.x, (float) forward.z,
+                        power, (float) travelSeconds));
     }
 
     @Override
@@ -324,6 +334,11 @@ public final class DashUppercutEffect implements SkillEffect {
             player.setDeltaMovement(v.x * 0.3, v.y, v.z * 0.3);
             player.hurtMarked = true;
 
+            // YENI: hedefe ulasilamasa (iskalama) bile yumruk yine de
+            // "sallandigi" icin yukari dogru yukselen ruzgar tuyu efekti
+            // yine tetikleniyor - bkz. VacuumWindFxPacket.
+            sendVacuumWind(player, powerOf(chargeRatio));
+
             // KARAR (v4): kullanicidan gelen geri bildirim uzerine - hedefli
             // ıskalamada (target vardi ama menzile hic girilemedi) artik HICBIR
             // koni/blok kirma efekti TETIKLENMIYOR. Sebep: "iskalama" karari
@@ -371,6 +386,10 @@ public final class DashUppercutEffect implements SkillEffect {
         // gore) egimiyle AYNI acida disari acilir (bkz. spawnPunchShockwave).
         spawnPunchShockwave(player, forward, power);
 
+        // YENI: isabet aninda da (metal sok dalgasina EK olarak) yukari
+        // dogru yukselen ruzgar tuyu efekti - bkz. VacuumWindFxPacket.
+        sendVacuumWind(player, power);
+
         // KARAR: hedefe GERCEKTEN isabet edildiyse koni artik hic acilmiyor.
         // Konumu/yaricapi tutarli hale getirmeye ugrasmak (hedefin konumundan
         // baslatma, minimum yaricap vb.) beklenen kaliteyi vermedi - bu yuzden
@@ -395,7 +414,24 @@ public final class DashUppercutEffect implements SkillEffect {
             Vec3 origin = player.getEyePosition();
             breakConeInFront(player, powerOf(chargeRatio), origin, player.getLookAngle());
             spawnWhiffSmoke(player, origin);
+            // YENI: hic hedef olmayan "bosa" yumrukta da ruzgar tuyu efekti
+            // cikar - bkz. VacuumWindFxPacket.
+            sendVacuumWind(player, powerOf(chargeRatio));
         }
+    }
+
+    /**
+     * Yumruk anindaki (isabet/iskalama/hedefsiz - farketmez) yukari dogru
+     * yukselen ruzgar tuyu efektini tetikler - bkz. VacuumWindFxPacket.
+     * Sabit bir origin GONDERMIYOR, entity ID gonderiyor: efekt client'ta
+     * 2.5 saniye boyunca karakterin GUNCEL pozisyonunu takip ederek
+     * periyodik tetiklenir (bkz. WindTrailFxRenderer.spawnVacuumEmitter) -
+     * boylece animasyon RETURNING fazina gecerken tek bir anlik pozisyonun
+     * yakalanmasindan kaynaklanan "yanlis yerden cikma" sorunu olmuyor.
+     */
+    private static void sendVacuumWind(ServerPlayer player, float power) {
+        ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player),
+                new VacuumWindFxPacket(player.getId(), power));
     }
 
     /**

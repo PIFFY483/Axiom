@@ -187,24 +187,47 @@ public final class DashUppercutEffect implements SkillEffect {
     private static final double CONE_MIN_RADIUS_MIN = 0.8; // blok - az sarj, koken yaricapi
     private static final double CONE_MIN_RADIUS_MAX = 1.6; // blok - tam sarj, koken yaricapi
 
+    // DUZELTME (hedefleme isabeti): eskiden lockTarget() yatay (forwardFlat)
+    // bir koridor icindeki EN YAKIN canliyi seciyordu - "bakis merkezine en
+    // yakin" degil, "oyuncuya en yakin". Bu yuzden koridor icinde kenarda
+    // duran ama oyuncuya yakin bir mob, tam bakilan ama biraz daha uzaktaki
+    // mobun onune geciyordu.
+    //
+    // Skill zaten sadece DUZ (yatay) atiliyor - yukari/asagi bakis dash'i
+    // etkilemiyor - o yuzden yon vektoru YINE forwardFlat (yatay), pitch'e
+    // dokunulmuyor. Degisen tek sey: adaylar arasinda artik "yatay bakis
+    // eksenine en yakin acida olan" kazaniyor (mesafe sadece esit acida
+    // ikincil kriter), "en yakin olan" degil.
+    private static final double TARGET_CONE_HALF_ANGLE_DEG = 28.0;
+    private static final double TARGET_CONE_MIN_COS = Math.cos(Math.toRadians(TARGET_CONE_HALF_ANGLE_DEG));
+    private static final double TARGET_DISTANCE_PENALTY = 0.015; // blok basina hafif mesafe cezasi
+
     @Override
     public LivingEntity lockTarget(ServerPlayer player) {
-        Vec3 forward = forwardFlat(player);
+        Vec3 look = forwardFlat(player); // yatay - dash zaten dikey hareket etmiyor
         Vec3 origin = player.position();
-        Vec3 tip = origin.add(forward.scale(FORWARD_RANGE));
+        Vec3 tip = origin.add(look.scale(FORWARD_RANGE));
         AABB searchBox = new AABB(origin, tip).inflate(SEARCH_WIDTH / 2.0, 1.0, SEARCH_WIDTH / 2.0);
 
         List<LivingEntity> candidates = player.level().getEntitiesOfClass(
                 LivingEntity.class, searchBox,
                 e -> e != player && e.isAlive() && !e.isSpectator());
 
-        LivingEntity closest = null;
-        double bestDistSq = Double.MAX_VALUE;
+        LivingEntity best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
         for (LivingEntity e : candidates) {
-            double d = e.distanceToSqr(player);
-            if (d < bestDistSq) { bestDistSq = d; closest = e; }
+            Vec3 toEntityFlat = e.getBoundingBox().getCenter().subtract(origin);
+            toEntityFlat = new Vec3(toEntityFlat.x, 0, toEntityFlat.z); // dikeyi at, sadece yatay aci onemli
+            double dist = toEntityFlat.length();
+            if (dist < 1.0e-4 || dist > FORWARD_RANGE) continue;
+
+            double cos = toEntityFlat.scale(1.0 / dist).dot(look);
+            if (cos < TARGET_CONE_MIN_COS) continue; // gorus konisinin disinda
+
+            double score = cos - dist * TARGET_DISTANCE_PENALTY;
+            if (score > bestScore) { bestScore = score; best = e; }
         }
-        return closest;
+        return best;
     }
 
     @Override
